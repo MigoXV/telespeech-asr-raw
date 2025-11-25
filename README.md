@@ -49,12 +49,7 @@
   * 若已有提好的特征，程序运行时可以使用wenet开源框架中kaldi_io.py实现的方法替换kaldiio.load_mat，从而无需安装kaldi
 
 <a id="fairseq安装"></a>
-* 安装fairseq及其依赖
-```shell script
-$ git clone https://github.com/pytorch/fairseq
-$ cd fairseq
-$ pip install --editable ./
-```
+* 本仓库已在`fairseq/`目录内自带精简后的fairseq源码（v0.12.2），无需额外编译或安装即可用于推理脚本；为避免C/CUDA扩展编译，已移除原版fairseq中的数据集/任务定义、训练器、优化器、学习率调度器以及所有损失函数等训练相关逻辑。如果需要完整训练链路，请改用官方fairseq安装包；若希望使用系统已安装的fairseq，可自行调整`PATH`/`PYTHONPATH`。
 
 * 安装fairseq额外依赖以及wenet表征训练任务运行所需依赖
 ```shell script
@@ -102,7 +97,7 @@ utt:X0000000001_100849618_S00006	feat:/data/raw_nnaudio.test.1.ark:2984296665	fe
 ```
 
 # 微调模型推理流程示例*
-1. [fairseq环境准备](#fairseq安装)，修改`data2vec_dialect/path.sh`文件中`/path/to/fairseq`为fairseq安装路径
+1. [fairseq环境准备](#fairseq安装)，运行`data2vec_dialect/path.sh`会自动将仓库内置的`fairseq/`加入`PYTHONPATH`
 2. 利用kaldi提取音频特征，准备data.list格式文件，参考[特征提取](#特征提取)，并命名为以 .tsv 结尾的文件
    * data.list中`text`、`token`是为了微调和统计CER使用，若只想拿到解码结果，data.list中的`text`、`token`只需保证有内容即可 
 3. 进入data2vec_dialect目录，并修改`run_scripts/decode.sh`文件，参考[推理与解码阶段](#推理与解码阶段)
@@ -119,7 +114,7 @@ utt:X0000000001_100849618_S00006	feat:/data/raw_nnaudio.test.1.ark:2984296665	fe
     $ ln -s /path/to/train/data.list /path/to/train/train.tsv
     $ ln -s /path/to/dev/data.list /path/to/train/dev.tsv
     ```
-* 进入data2vec_dialect目录，修改`path.sh`文件中`/path/to/fairseq`为fairseq安装路径
+* 进入data2vec_dialect目录，执行`source path.sh`即可自动使用仓库内置的fairseq
 * 将`run_scripts/run_d2v_finetune.sh`中`/path/to`相关路径替换
 * 修改`task.data`为 .tsv 文件保存路径，如`task.data=/data/wenetspeech/train`
 * 在data2vec_dialect路径下，执行

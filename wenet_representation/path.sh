@@ -1,4 +1,8 @@
-export WENET_DIR=/path/to/wenet_representation/wenet
-# NOTE(kan-bayashi): Use UTF-8 in Python to avoid UnicodeDecodeError when LC_ALL=C
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+REPO_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
+
+export WENET_DIR="$SCRIPT_DIR/wenet"
 export PYTHONIOENCODING=UTF-8
-export PYTHONPATH=/path/to/fairseq:/path/to/data2vec_dialect:$PYTHONPATH
+export FAIRSEQ_DIR="$REPO_ROOT/fairseq"
+export DATA2VEC_DIALECT_DIR="$REPO_ROOT/data2vec_dialect"
+export PYTHONPATH="$FAIRSEQ_DIR:$DATA2VEC_DIALECT_DIR:$PYTHONPATH"
