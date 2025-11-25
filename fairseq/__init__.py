@@ -34,7 +34,4 @@ import fairseq.distributed  # noqa
 import fairseq.models  # noqa
 import fairseq.modules  # noqa
 import fairseq.pdb  # noqa
-import fairseq.scoring  # noqa
 import fairseq.token_generation_constraints  # noqa
-
-import fairseq.model_parallel  # noqa
