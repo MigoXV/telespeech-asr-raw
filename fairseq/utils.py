@@ -524,12 +524,14 @@ def log_softmax(x, dim: int, onnx_trace: bool = False):
 
 
 def get_perplexity(loss, round=2, base=2):
-    from fairseq.logging.meters import safe_round
-
     if loss is None:
         return 0.0
     try:
-        return safe_round(base**loss, round)
+        if hasattr(loss, "__round__"):
+            return round(base**loss, round)
+        if torch.is_tensor(loss) and loss.numel() == 1:
+            return round(base ** loss.item(), round)
+        return base**loss
     except OverflowError:
         return float("inf")
 

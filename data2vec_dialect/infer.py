@@ -11,10 +11,11 @@ import os
 import shutil
 import sys
 import re
+import time
 import types
 from dataclasses import dataclass, field, is_dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 import editdistance
 import torch
@@ -23,7 +24,7 @@ from examples.speech_recognition.new.decoders.decoder_config import (
     FlashlightDecoderConfig,
 )
 from examples.speech_recognition.new.decoders.decoder import Decoder
-from fairseq import checkpoint_utils, progress_bar, tasks, utils
+from fairseq import checkpoint_utils, tasks, utils
 from fairseq.data.data_utils import post_process
 from fairseq.dataclass.configs import (
     CheckpointConfig,
@@ -33,8 +34,6 @@ from fairseq.dataclass.configs import (
     DistributedTrainingConfig,
     FairseqDataclass,
 )
-from fairseq.logging.meters import StopwatchMeter, TimeMeter
-from fairseq.logging.progress_bar import BaseProgressBar
 from fairseq.models.fairseq_model import FairseqModel
 from omegaconf import OmegaConf
 
@@ -46,6 +45,69 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 config_path = Path(__file__).resolve().parent / "config"
+
+
+class StopwatchMeter:
+    def __init__(self) -> None:
+        self.reset()
+
+    def start(self) -> None:
+        self._start = time.perf_counter()
+
+    def stop(self, n: int = 1) -> None:
+        if self._start is None:
+            return
+        elapsed = time.perf_counter() - self._start
+        self.sum += elapsed
+        self.n += n
+        self._start = None
+
+    def reset(self) -> None:
+        self._start: Optional[float] = None
+        self.n = 0
+        self.sum = 0.0
+
+    @property
+    def avg(self) -> float:
+        return self.sum / self.n if self.n > 0 else 0.0
+
+
+class TimeMeter:
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self.n = 0
+        self.start = time.perf_counter()
+
+    def update(self, val: int = 1) -> None:
+        self.n += val
+
+    @property
+    def avg(self) -> float:
+        elapsed = time.perf_counter() - self.start
+        return self.n / elapsed if elapsed > 0 else 0.0
+
+
+class SimpleProgressBar:
+    def __init__(self, iterator: Iterable[Any]):
+        self.iterator = iter(iterator)
+
+    def __iter__(self) -> "SimpleProgressBar":
+        return self
+
+    def __next__(self) -> Any:
+        return next(self.iterator)
+
+    def log(self, *args, **kwargs) -> None:
+        stats = args[0] if args else kwargs.get("stats")
+        if stats:
+            logger.info("Progress stats: %s", stats)
+
+    def print(self, *args, **kwargs) -> None:
+        message = " ".join(str(a) for a in args)
+        if message:
+            logger.info(message)
 
 
 @dataclass
@@ -261,16 +323,8 @@ class InferenceProcessor:
         epoch: Optional[int] = None,
         prefix: Optional[str] = None,
         default_log_format: str = "tqdm",
-    ) -> BaseProgressBar:
-        return progress_bar.progress_bar(
-            iterator=self.get_dataset_itr(),
-            log_format=self.cfg.common.log_format,
-            log_interval=self.cfg.common.log_interval,
-            epoch=epoch,
-            prefix=prefix,
-            tensorboard_logdir=self.cfg.common.tensorboard_logdir,
-            default_log_format=default_log_format,
-        )
+    ) -> SimpleProgressBar:
+        return SimpleProgressBar(self.get_dataset_itr())
 
     @property
     def data_parallel_world_size(self):
