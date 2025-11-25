@@ -16,10 +16,7 @@
   - [特征提取](#特征提取)
   - [字典准备](#字典准备)
 - [微调模型推理流程示例\*](#微调模型推理流程示例)
-- [预训练模型微调](#预训练模型微调)
-  - [微调阶段](#微调阶段)
-  - [推理与解码阶段](#推理与解码阶段)
-- [表征训练下游任务](#表征训练下游任务)
+- [推理与解码](#推理与解码)
 - [开源数据集结果](#开源数据集结果)
 - [声明与协议](#声明与协议)
   - [声明](#声明)
@@ -39,24 +36,26 @@
 | finetune_large_kespeech | 0.3 B | [TeleSpeech-ASR1.0-large-kespeech](https://huggingface.co/Tele-AI/TeleSpeech-ASR1.0/blob/main/finetune_large_kespeech.pt) | [dict.char7531.txt](https://huggingface.co/Tele-AI/TeleSpeech-ASR1.0/blob/main/dict.chr7531.txt) | 基于pretrain_large，采用KeSpeech数据集[8种方言](#KeSpeech各方言上结果)微调训练|
 
 * finetune模型为已经在特定数据集微调过的模型，可直接使用
-* pretrain模型为无监督预训练模型，**无法直接进行ASR任务**，需要用少量标注数据进行有监督训练后使用。相比于直接训练的方言识别模型，基于预训练模型可以利用更少的有标注数据获得更好的方言识别性能。我们提供了两种有监督训练框架，用于下游ASR任务：1) 基于fairseq的预训练模型微调； 2) 基于wenet的表征提取（特征提取器）训练下游ASR模型
+* pretrain模型为无监督预训练模型，**无法直接进行ASR任务**，需要用少量标注数据进行有监督训练后使用。相比于直接训练的方言识别模型，基于预训练模型可以利用更少的有标注数据获得更好的方言识别性能。本仓库现聚焦于推理解码链路，如需完整训练流程请参考官方fairseq或其他开源方案
 
 # 环境配置
 
 * PyTorch version >= 1.13.0
 * Python version >= 3.8
-* 数据准备、程序训练需要使用kaldi，请确保已正确安装：https://github.com/kaldi-asr/kaldi
+* 数据准备需要使用kaldi，请确保已正确安装：https://github.com/kaldi-asr/kaldi
   * 若已有提好的特征，程序运行时可以使用wenet开源框架中kaldi_io.py实现的方法替换kaldiio.load_mat，从而无需安装kaldi
 
 <a id="fairseq安装"></a>
 * 本仓库已在`fairseq/`目录内自带精简后的fairseq源码（v0.12.2），无需额外编译或安装即可用于推理脚本；为避免C/CUDA扩展编译，已移除原版fairseq中的数据集/任务定义、训练器、优化器、学习率调度器以及所有损失函数等训练相关逻辑。如果需要完整训练链路，请改用官方fairseq安装包；若希望使用系统已安装的fairseq，可自行调整`PATH`/`PYTHONPATH`。
 
-* 安装fairseq额外依赖以及wenet表征训练任务运行所需依赖
+* 推理无关的wenet表征训练等模块已从仓库移除，仅保留必要的解码脚本与依赖
+
+* 安装推理解码所需依赖
 ```shell script
 $ pip install -r requirements.txt
 ```
 
-* 若只需要fairseq进行微调、解码，可以不安装完整的requirements.txt，只需保证kaldiio, timm, editdistance, soundfile已正确安装
+* 若只需要运行解码脚本，可以不安装完整的requirements.txt，只需保证kaldiio, timm, editdistance, soundfile已正确安装
 ```shell script
 $ pip install kaldiio timm editdistance soundfile
 ```
@@ -86,71 +85,23 @@ utt:X0000000001_100849618_S00006	feat:/data/raw_nnaudio.test.1.ark:2984296665	fe
 ...
 ```
 
-* 预训练模型表征训练ASR任务阶段，需要准备wenet格式的`lang_char.txt`，相比于`dict.${label}.txt`额外添加`<blank>`, `<unk>`, `<sos/eos>`3个token，例如
-```
-<blank> 0
-<unk> 1
-是 2
-好 3
-...
-<sos/eos> 5536
-```
-
 # 微调模型推理流程示例*
 1. [fairseq环境准备](#fairseq安装)，运行`data2vec_dialect/path.sh`会自动将仓库内置的`fairseq/`加入`PYTHONPATH`
 2. 利用kaldi提取音频特征，准备data.list格式文件，参考[特征提取](#特征提取)，并命名为以 .tsv 结尾的文件
    * data.list中`text`、`token`是为了微调和统计CER使用，若只想拿到解码结果，data.list中的`text`、`token`只需保证有内容即可 
-3. 进入data2vec_dialect目录，并修改`run_scripts/decode.sh`文件，参考[推理与解码阶段](#推理与解码阶段)
+3. 进入data2vec_dialect目录，并修改`run_scripts/decode.sh`文件，参考[推理与解码](#推理与解码)
 4. 在data2vec_dialect路径下，执行`run_scripts/decode.sh`
 
-*仅经过微调后的finetune模型支持直接推理，无监督预训练模型`pretrain_base`和`pretrain_large`需要先在标注数据上训练后，再进行推理，详见[预训练模型微调](#预训练模型微调)或[表征训练下游任务](#表征训练下游任务)
+*仅经过微调后的finetune模型支持直接推理，无监督预训练模型`pretrain_base`和`pretrain_large`需要先在标注数据上训练后，再进行推理，相关训练链路不再随仓库提供。
 
-# 预训练模型微调
-<a id="预训练模型微调"></a>
+<a id="推理与解码"></a>
 
-## 微调阶段
-* 准备`train.tsv`和`dev.tsv`，保存于同一训练目录下
-    ```
-    $ ln -s /path/to/train/data.list /path/to/train/train.tsv
-    $ ln -s /path/to/dev/data.list /path/to/train/dev.tsv
-    ```
-* 进入data2vec_dialect目录，执行`source path.sh`即可自动使用仓库内置的fairseq
-* 将`run_scripts/run_d2v_finetune.sh`中`/path/to`相关路径替换
-* 修改`task.data`为 .tsv 文件保存路径，如`task.data=/data/wenetspeech/train`
-* 在data2vec_dialect路径下，执行
-    ```shell script
-    $ bash run_scripts/run_d2v_finetune.sh
-    ```
-
-<a id="推理与解码阶段"></a>
-
-## 推理与解码阶段
-* 同样修改`run_scripts/decode.sh`中的模型路径、测试数据路径等
+# 推理与解码
+* 修改`run_scripts/decode.sh`中的模型路径、测试数据路径等
   * `dataset.gen_subset`为测试数据路径下 .tsv 文件的名称，可配置多个
-* 执行
+* 在data2vec_dialect路径下执行
     ```shell script
     $ bash run_scripts/decode.sh
-    ```
-
-# 表征训练下游任务
-<a id="表征训练下游任务"></a>
-
-* 进入wenet_representation路径，修改`path.sh`文件中`fairseq`, `data2vec_dialect`, `wenet_representation`相关路径
-
-* 连续表征训练与解码：
-  * 配置`run_d2v.sh`中dataset相关内容，执行
-    ```shell script
-    $ bash run_d2v.sh
-    ```
-
-* 离散表征训练与解码：
-  * 首先根据`data.list`，准备离散表征对应训练文件`data.list.discrete`，修改`wenet/discrete_token/kmeans_d2v.yaml`中`model_dir`和`user_dir`，执行
-    ```
-    $ bash wenet/discrete_token/dump_feat.sh
-    ```
-  * 再配置`run_discrete.sh`中dataset相关内容，执行
-    ```
-    $ bash run_discrete.sh
     ```
 # 开源数据集结果
 * 我们选择了多个开源中文数据集进行验证，以测试集上的字错误率 (Character Error Rate, CER) 结果作为衡量标准
