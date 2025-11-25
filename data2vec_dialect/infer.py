@@ -18,13 +18,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import editdistance
 import torch
-import torch.distributed as dist
 from examples.speech_recognition.new.decoders.decoder_config import (
     DecoderConfig,
     FlashlightDecoderConfig,
 )
 from examples.speech_recognition.new.decoders.decoder import Decoder
-from fairseq import checkpoint_utils, distributed_utils, progress_bar, tasks, utils
+from fairseq import checkpoint_utils, progress_bar, tasks, utils
 from fairseq.data.data_utils import post_process
 from fairseq.dataclass.configs import (
     CheckpointConfig,
@@ -211,7 +210,6 @@ class InferenceProcessor:
                         shard_fpath.unlink()
                 shutil.move(f"{fname}.0", fname)
 
-            dist.barrier()  # ensure all shards finished writing
             if shard_id == (0 % num_shards):
                 merge_shards_with_root("hypo.word")
             if shard_id == (1 % num_shards):
@@ -220,7 +218,6 @@ class InferenceProcessor:
                 merge_shards_with_root("ref.word")
             if shard_id == (3 % num_shards):
                 merge_shards_with_root("ref.units")
-            dist.barrier()
 
     def optimize_model(self, model: FairseqModel) -> None:
         model.make_generation_fast_()
@@ -277,15 +274,11 @@ class InferenceProcessor:
 
     @property
     def data_parallel_world_size(self):
-        if self.cfg.distributed_training.distributed_world_size == 1:
-            return 1
-        return distributed_utils.get_data_parallel_world_size()
+        return 1
 
     @property
     def data_parallel_rank(self):
-        if self.cfg.distributed_training.distributed_world_size == 1:
-            return 0
-        return distributed_utils.get_data_parallel_rank()
+        return 0
 
     def process_sentence(
         self,
@@ -420,24 +413,16 @@ def main(cfg: InferConfig) -> float:
 
         errs_t, leng_t = processor.total_errors, processor.total_length
 
-        if cfg.common.cpu:
-            logger.warning("Merging WER requires CUDA.")
-        elif processor.data_parallel_world_size > 1:
-            stats = torch.LongTensor([errs_t, leng_t]).cuda()
-            dist.all_reduce(stats, op=dist.ReduceOp.SUM)
-            errs_t, leng_t = stats[0].item(), stats[1].item()
-
         wer = errs_t * 100.0 / leng_t
 
-        if distributed_utils.is_master(cfg.distributed_training):
-            with open(wer_file, "w") as f:
-                f.write(
-                    (
-                        f"WER: {wer}\n"
-                        f"err / num_ref_words = {errs_t} / {leng_t}\n\n"
-                        f"{yaml_str}"
-                    )
+        with open(wer_file, "w") as f:
+            f.write(
+                (
+                    f"WER: {wer}\n"
+                    f"err / num_ref_words = {errs_t} / {leng_t}\n\n"
+                    f"{yaml_str}"
                 )
+            )
 
         return wer
 
@@ -456,13 +441,7 @@ def hydra_main(cfg: InferConfig) -> Union[float, Tuple[float, Optional[float]]]:
     wer = float("inf")
 
     try:
-        if cfg.common.profile:
-            with torch.cuda.profiler.profile():
-                with torch.autograd.profiler.emit_nvtx():
-                    distributed_utils.call_main(cfg, main)
-        else:
-            distributed_utils.call_main(cfg, main)
-
+        main(cfg)
         wer = parse_wer(get_wer_file(cfg))
     except BaseException as e:  # pylint: disable=broad-except
         if not cfg.common.suppress_crashes:

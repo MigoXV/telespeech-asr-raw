@@ -11,7 +11,6 @@ from fairseq.modules.transformer_sentence_encoder import init_bert_params
 from typing import Optional
 from fairseq.models.xmod.hub_interface import XMODHubInterface
 import torch
-from fairseq.distributed import fsdp_wrap
 from fairseq.models import (
     register_model,
     register_model_architecture,
@@ -20,6 +19,12 @@ from fairseq.models import (
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 
 DEFAULT_MIN_PARAMS_TO_WRAP = int(1e8)
+
+
+def fsdp_wrap(module, **kwargs):
+    """Identity wrapper used when distributed training is disabled."""
+
+    return module
 
 
 @register_model("xmod")

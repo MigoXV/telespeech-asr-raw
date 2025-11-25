@@ -48,10 +48,8 @@ class FileContentsAction(argparse.Action):
         super(FileContentsAction, self).__init__(option_strings, dest, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        from fairseq.file_io import PathManager
-
-        if PathManager.isfile(values):
-            with PathManager.open(values) as f:
+        if os.path.isfile(values):
+            with open(values) as f:
                 argument = f.read().strip()
         else:
             argument = values

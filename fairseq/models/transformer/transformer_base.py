@@ -11,13 +11,18 @@ from torch import Tensor
 
 from fairseq import utils
 from fairseq.dataclass.utils import gen_parser_from_dataclass
-from fairseq.distributed import fsdp_wrap
 from fairseq.models import FairseqEncoderDecoderModel
 from fairseq.models.transformer import (
     TransformerConfig,
     TransformerDecoderBase,
     TransformerEncoderBase,
 )
+
+
+def fsdp_wrap(module, **kwargs):
+    """No-op wrapper to keep interfaces intact without distributed dependencies."""
+
+    return module
 
 
 class TransformerModelBase(FairseqEncoderDecoderModel):

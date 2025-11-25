@@ -144,13 +144,9 @@ def cached_path_from_pm(url_or_filename):
     Tries to cache the specified URL using PathManager class.
     Returns the cached path if success otherwise failure.
     """
-    try:
-        from fairseq.file_io import PathManager
-
-        local_path = PathManager.get_local_path(url_or_filename)
-        return local_path
-    except Exception:
-        return None
+    if os.path.exists(url_or_filename):
+        return url_or_filename
+    return None
 
 
 def cached_path(url_or_filename, cache_dir=None):
