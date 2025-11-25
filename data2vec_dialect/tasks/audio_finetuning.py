@@ -23,7 +23,6 @@ from fairseq.data.text_compressor import TextCompressor, TextCompressionLevel
 
 from fairseq.tasks import register_task
 from fairseq import utils
-from fairseq.logging import metrics
 import re
 
 
@@ -367,44 +366,39 @@ class SpecFinetuningTask(SpecPretrainingTask):
                 log.get("_num_word_errors", zero) for log in logging_outputs
             )
             num_words = sum(log.get("_num_words", zero) for log in logging_outputs)
-            metrics.log_scalar("_num_char_errors", num_char_errors)
-            metrics.log_scalar("_num_chars", num_chars)
-            metrics.log_scalar("_num_word_errors", num_word_errors)
-            metrics.log_scalar("_num_words", num_words)
-            if num_chars > 0:
-                metrics.log_derived(
-                    "uer",
-                    lambda meters: meters["_num_char_errors"].sum
-                    * 100.0
-                    / meters["_num_chars"].sum
-                    if meters["_num_chars"].sum > 0
-                    else float("nan"),
-                )
-            if num_words > 0:
-                metrics.log_derived(
-                    "wer",
-                    lambda meters: meters["_num_word_errors"].sum
-                    * 100.0
-                    / meters["_num_words"].sum
-                    if meters["_num_words"].sum > 0
-                    else float("nan"),
-                )
+            uer = (
+                num_char_errors * 100.0 / num_chars
+                if num_chars > 0
+                else float("nan")
+            )
+            wer = (
+                num_word_errors * 100.0 / num_words
+                if num_words > 0
+                else float("nan")
+            )
+
+            logger.info(
+                "Validation errors: chars=%s/%s (UER=%.4f), words=%s/%s (WER=%.4f)",
+                num_char_errors,
+                num_chars,
+                uer,
+                num_word_errors,
+                num_words,
+                wer,
+            )
         if self.cfg.eval_bleu:
             len_keys = ["_bleu_sys_len", "_bleu_ref_len"]
             count_keys = [f"_bleu_counts_{i}" for i in range(4)]
             total_keys = [f"_bleu_totals_{i}" for i in range(4)]
-            for k in len_keys + count_keys + total_keys:
-                metrics.log_scalar(k, sum(log.get(k, 0) for log in logging_outputs))
+            agg = {k: sum(log.get(k, 0) for log in logging_outputs) for k in len_keys + count_keys + total_keys}
 
             import sacrebleu
 
-            metrics.log_derived(
-                "bleu",
-                lambda meters: sacrebleu.compute_bleu(
-                    correct=[meters[k].sum for k in count_keys],
-                    total=[meters[k].sum for k in total_keys],
-                    sys_len=meters["_bleu_sys_len"].sum,
-                    ref_len=meters["_bleu_ref_len"].sum,
-                    smooth_method="exp",
-                ).score,
-            )
+            bleu = sacrebleu.compute_bleu(
+                correct=[agg[k] for k in count_keys],
+                total=[agg[k] for k in total_keys],
+                sys_len=agg["_bleu_sys_len"],
+                ref_len=agg["_bleu_ref_len"],
+                smooth_method="exp",
+            ).score
+            logger.info("Validation BLEU: %.4f", bleu)

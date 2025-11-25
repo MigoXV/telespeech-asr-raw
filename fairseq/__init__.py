@@ -16,13 +16,6 @@ except ImportError:
 
 __all__ = []
 
-# backwards compatibility to support `from fairseq.X import Y`
-from fairseq.logging import meters, metrics, progress_bar  # noqa
-
-sys.modules["fairseq.meters"] = meters
-sys.modules["fairseq.metrics"] = metrics
-sys.modules["fairseq.progress_bar"] = progress_bar
-
 # initialize hydra
 from fairseq.dataclass.initialize import hydra_init
 
