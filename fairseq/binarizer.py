@@ -15,7 +15,6 @@ import torch
 
 from fairseq.data import Dictionary, indexed_dataset
 from fairseq.file_chunker_utils import Chunker, find_offsets
-from fairseq.file_io import PathManager
 from fairseq.tokenizer import tokenize_line
 
 logger = logging.getLogger("binarizer")
@@ -193,7 +192,7 @@ class FileBinarizer:
         summary = BinarizeSummary()
 
         with Chunker(
-            PathManager.get_local_path(filename), offset_start, offset_end
+            filename, offset_start, offset_end
         ) as line_iterator:
             for line in line_iterator:
                 ds.add_item(binarizer.binarize_line(line, summary))
@@ -368,7 +367,7 @@ class LegacyBinarizer:
         summary = BinarizeSummary()
 
         with Chunker(
-            PathManager.get_local_path(filename), offset_start, offset_end
+            filename, offset_start, offset_end
         ) as line_iterator:
             for line in line_iterator:
                 consumer(binarizer.binarize_line(line, summary))

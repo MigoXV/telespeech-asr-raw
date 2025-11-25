@@ -8,7 +8,6 @@ import re
 from operator import attrgetter, itemgetter
 import torch
 import numpy as np
-import torch.distributed as dist
 import torch.nn as nn
 
 from .modules import PQConv2d, PQEmbedding, PQLinear
@@ -67,10 +66,7 @@ def quantize_model_(
     for layer in quantized_layers:
 
         # book-keeping
-        is_master_process = (not dist.is_initialized()) or (
-            dist.is_initialized() and dist.get_rank() == 0
-        )
-        verbose = verbose and is_master_process
+        verbose = verbose
 
         # get block size and centroids
         module = attrgetter(layer)(model)
@@ -130,11 +126,6 @@ def quantize_model_(
             assignments.cuda()
             print("assignments")
             print(assignments)
-
-        # broadcast results to make sure weights are up-to-date
-        if dist.is_initialized():
-            dist.broadcast(centroids, 0)
-            dist.broadcast(assignments, 0)
 
         # instantiate the quantized counterpart
         if isinstance(module, nn.Linear):

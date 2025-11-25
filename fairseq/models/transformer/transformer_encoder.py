@@ -11,7 +11,6 @@ import torch.nn as nn
 from torch import Tensor
 
 from fairseq import utils
-from fairseq.distributed import fsdp_wrap
 from fairseq.models import FairseqEncoder
 from fairseq.models.transformer import TransformerConfig
 from fairseq.modules import (
@@ -24,6 +23,12 @@ from fairseq.modules import (
 )
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
+
+
+def fsdp_wrap(module, **kwargs):
+    """No-op wrapper to keep interfaces intact without distributed dependencies."""
+
+    return module
 
 
 # rewrite name for backward compatibility in `make_generation_fast_`

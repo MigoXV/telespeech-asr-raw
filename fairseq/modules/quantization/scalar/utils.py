@@ -6,7 +6,6 @@
 import logging
 from operator import attrgetter
 
-import torch.distributed as dist
 import torch.nn as nn
 
 from ..pq.utils import attrsetter, get_layers
@@ -36,14 +35,9 @@ def quantize_model_(
 
     for layer in quantized_layers:
 
-        # book-keeping
-        is_master_process = (not dist.is_initialized()) or (
-            dist.is_initialized() and dist.get_rank() == 0
-        )
-
         # recover module
         module = attrgetter(layer)(model)
-        if is_master_process:
+        if verbose:
             logging.info(
                 f"Quantizing layer {layer} with bits={bits} and QuantNoise={p}"
             )

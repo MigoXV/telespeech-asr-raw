@@ -10,12 +10,10 @@ import torch
 import torch.nn as nn
 
 from fairseq import utils
-from fairseq.distributed import fsdp_wrap
 from fairseq.models import FairseqIncrementalDecoder
 from fairseq.models.transformer import TransformerConfig
 from fairseq.modules import (
     AdaptiveSoftmax,
-    BaseLayer,
     FairseqDropout,
     LayerDropModuleList,
     LayerNorm,
@@ -26,6 +24,12 @@ from fairseq.modules import (
 from fairseq.modules.checkpoint_activations import checkpoint_wrapper
 from fairseq.modules.quant_noise import quant_noise as apply_quant_noise_
 from torch import Tensor
+
+
+def fsdp_wrap(module, **kwargs):
+    """Placeholder wrapper to maintain API compatibility without distributed deps."""
+
+    return module
 
 
 # rewrite name for backward compatibility in `make_generation_fast_`
@@ -164,13 +168,6 @@ class TransformerDecoderBase(FairseqIncrementalDecoder):
             nn.init.normal_(
                 self.output_projection.weight, mean=0, std=self.output_embed_dim**-0.5
             )
-        num_base_layers = cfg.base_layers
-        for i in range(num_base_layers):
-            self.layers.insert(
-                ((i + 1) * cfg.decoder.layers) // (num_base_layers + 1),
-                BaseLayer(cfg),
-            )
-
     def build_decoder_layer(self, cfg, no_encoder_attn=False):
         layer = transformer_layer.TransformerDecoderLayerBase(cfg, no_encoder_attn)
         checkpoint = cfg.checkpoint_activations

@@ -16,7 +16,6 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import open_dict, OmegaConf
 
 from .composite_encoder import CompositeEncoder
-from .distributed_fairseq_model import DistributedFairseqModel
 from .fairseq_decoder import FairseqDecoder
 from .fairseq_encoder import FairseqEncoder
 from .fairseq_incremental_decoder import FairseqIncrementalDecoder

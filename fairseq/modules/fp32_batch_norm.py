@@ -13,16 +13,8 @@ class Fp32BatchNorm(nn.Module):
     def __init__(self, sync=False, *args, **kwargs):
         super().__init__()
 
-        if sync:
-            from fairseq.distributed import utils
-
-            if utils.get_global_world_size() == 1:
-                sync = False
-
-        if sync:
-            self.bn = nn.SyncBatchNorm(*args, **kwargs)
-        else:
-            self.bn = nn.BatchNorm1d(*args, **kwargs)
+        # Distributed sync batch norm is removed, fall back to standard BatchNorm.
+        self.bn = nn.BatchNorm1d(*args, **kwargs)
 
         self.sync = sync
 
